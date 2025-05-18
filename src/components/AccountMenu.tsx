@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAccount, useDisconnect, useChainId } from 'wagmi'
 import { Button } from './ui/button'
-import { ExternalLink, LogOut, Send } from 'lucide-react'
+import { ExternalLink, LogOut, Send, Maximize2, X, Download } from 'lucide-react'
 import { Separator } from './ui/separator'
 import { toast } from 'sonner'
 import { Skeleton } from './ui/skeleton'
@@ -20,6 +20,7 @@ import {
 } from './ui/dropdown-menu'
 import { useWriteContract } from 'wagmi'
 import { CONTRACT_ABI } from '@/lib/contract'
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
 
 interface NFTInstance {
   id: string
@@ -70,6 +71,7 @@ export function AccountMenu() {
   const [selectedNFT, setSelectedNFT] = useState<{collection: NFTCollection, token: NFTInstance} | null>(null)
   const [recipientAddress, setRecipientAddress] = useState('')
   const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false)
+  const [isImageDialogOpen, setIsImageDialogOpen] = useState(false)
 
   const { writeContract, isPending } = useWriteContract()
 
@@ -275,6 +277,16 @@ export function AccountMenu() {
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => {
+                                  setSelectedNFT({ collection, token });
+                                  setIsImageDialogOpen(true);
+                                }}
+                                className="gap-2"
+                              >
+                                <Maximize2 className="h-4 w-4" />
+                                <span>Expand</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
                                   const baseUrl = chainId === 1480 ? 'https://vanascan.io' : 'https://moksha.vanascan.io'
                                   window.open(`${baseUrl}/token/${collection.token.address}/instance/${token.id}`, '_blank')
                                 }}
@@ -317,6 +329,70 @@ export function AccountMenu() {
             >
               {isPending ? 'Sending...' : 'Send NFT'}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isImageDialogOpen} onOpenChange={setIsImageDialogOpen}>
+        <DialogContent className="sm:max-w-[800px] bg-transparent border-none shadow-none">
+          <DialogHeader>
+            <VisuallyHidden asChild>
+              <DialogTitle>NFT Görüntüleyici</DialogTitle>
+            </VisuallyHidden>
+          </DialogHeader>
+          <div className="absolute right-4 top-4 flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-full bg-black/20 hover:bg-black/40 backdrop-blur-sm"
+              onClick={async () => {
+                if (selectedNFT) {
+                  const imageUrl = getImageUrl(selectedNFT.token);
+                  try {
+                    const response = await fetch(imageUrl);
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `nft-${selectedNFT.token.id}.png`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                  } catch (error) {
+                    console.error('İndirme hatası:', error);
+                    window.open(imageUrl, '_blank');
+                  }
+                }
+              }}
+            >
+              <Download className="h-5 w-5 text-white" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-full bg-black/20 hover:bg-black/40 backdrop-blur-sm"
+              onClick={() => setIsImageDialogOpen(false)}
+            >
+              <X className="h-5 w-5 text-white" />
+            </Button>
+          </div>
+          <div className="flex items-center justify-center p-4">
+            {selectedNFT && (
+              <img
+                src={getImageUrl(selectedNFT.token)}
+                alt={selectedNFT.token.metadata?.name || `Token #${selectedNFT.token.id}`}
+                className="max-h-[70vh] w-auto object-contain rounded-lg transition-transform duration-300 hover:scale-105 hover:rotate-1 cursor-pointer shadow-2xl"
+                onClick={() => {
+                  const imageUrl = selectedNFT.token.metadata?.image;
+                  if (imageUrl?.startsWith('ipfs://')) {
+                    window.open(imageUrl.replace('ipfs://', 'https://ipfs.io/ipfs/'), '_blank');
+                  } else if (selectedNFT.token.image_url) {
+                    window.open(selectedNFT.token.image_url, '_blank');
+                  }
+                }}
+              />
+            )}
           </div>
         </DialogContent>
       </Dialog>
